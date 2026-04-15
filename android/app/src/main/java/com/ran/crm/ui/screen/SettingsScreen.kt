@@ -232,9 +232,17 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // 2. Sync Data
                         Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier =
+                                        Modifier.fillMaxWidth().clickable {
+                                                Toast.makeText(
+                                                                context,
+                                                                "Sync initiated...",
+                                                                Toast.LENGTH_SHORT
+                                                        )
+                                                        .show()
+                                                SyncWorker.scheduleOneTimeSync(context, true)
+                                        },
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                                 Column {
