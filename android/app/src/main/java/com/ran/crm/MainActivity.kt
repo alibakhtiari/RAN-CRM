@@ -41,6 +41,7 @@ import com.ran.crm.navigation.NavGraph
 import com.ran.crm.service.CallLogObserver
 import com.ran.crm.ui.theme.RANCRMTheme
 import com.ran.crm.utils.SyncLogger
+import com.ran.crm.work.SyncWorker
 
 class MainActivity : ComponentActivity() {
 
@@ -122,6 +123,9 @@ class MainActivity : ComponentActivity() {
 
         // Periodic sync is now scheduled in CrmApplication.onCreate()
         // so it survives Activity restarts and device reboots.
+
+        // Trigger a delta sync on app load to ensure data freshness
+        SyncWorker.scheduleOneTimeSync(this, forceFullSync = false)
 
         enableEdgeToEdge()
         setContent {
