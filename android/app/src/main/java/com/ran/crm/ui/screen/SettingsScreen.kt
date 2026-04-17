@@ -54,15 +54,22 @@ fun SettingsScreen(
         val scope = rememberCoroutineScope()
 
         // Sync Status
-        var lastSyncTime by remember { mutableStateOf(preferenceManager.lastSyncContacts) }
+        var lastSyncTime by remember { 
+            mutableStateOf(preferenceManager.lastSyncContacts.coerceAtLeast(preferenceManager.lastSyncCalls)) 
+        }
 
         // Observe preference changes to update timestamp dynamically
-        DisposableEffect(Unit) {
-                val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                        if (key == "last_sync_contacts") {
-                                lastSyncTime = preferenceManager.lastSyncContacts
+        // Use remember to keep a STRONG reference (SharedPreferences listener is weak)
+        val listener = remember(preferenceManager) {
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        SyncLogger.log("UI: Preference changed: $key")
+                        if (key == "last_sync_contacts" || key == "last_sync_calls") {
+                                lastSyncTime = preferenceManager.lastSyncContacts.coerceAtLeast(preferenceManager.lastSyncCalls)
                         }
                 }
+        }
+
+        DisposableEffect(preferenceManager) {
                 preferenceManager.registerOnSharedPreferenceChangeListener(listener)
                 onDispose {
                         preferenceManager.unregisterOnSharedPreferenceChangeListener(listener)
