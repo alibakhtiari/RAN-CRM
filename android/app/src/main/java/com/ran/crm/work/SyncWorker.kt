@@ -16,9 +16,14 @@ import kotlinx.coroutines.withContext
 class SyncWorker(context: Context, workerParams: WorkerParameters) :
         CoroutineWorker(context, workerParams) {
 
-    override suspend fun doWork(): Result =
-            withContext(Dispatchers.IO) {
-                SyncLogger.log("SyncWorker: === Worker Started ===")
+    init {
+        SyncLogger.log("SyncWorker: Instance created (ID: ${workerParams.id})")
+    }
+
+    override suspend fun doWork(): Result {
+        SyncLogger.log("SyncWorker: doWork() started")
+        return withContext(Dispatchers.IO) {
+            SyncLogger.log("SyncWorker: IO dispatch started")
                 try {
                     // Promote to foreground so Android doesn't kill us in Doze
                     setForeground(SyncNotificationHelper.createForegroundInfo(applicationContext))
@@ -82,6 +87,7 @@ class SyncWorker(context: Context, workerParams: WorkerParameters) :
                     Result.retry()
                 }
             }
+    }
 
     companion object {
         private const val SYNC_WORK_NAME = "crm_sync_work"
@@ -112,8 +118,9 @@ class SyncWorker(context: Context, workerParams: WorkerParameters) :
         }
 
         fun scheduleOneTimeSync(context: Context, forceFullSync: Boolean = false) {
+            SyncLogger.log("SyncWorker: scheduleOneTimeSync requested (force=$forceFullSync)")
             val constraints =
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build()
 
             val data = Data.Builder().putBoolean("force_full_sync", forceFullSync).build()
 
@@ -135,6 +142,7 @@ class SyncWorker(context: Context, workerParams: WorkerParameters) :
                             ExistingWorkPolicy.REPLACE,
                             syncWorkRequest
                     )
+            SyncLogger.log("SyncWorker: Work enqueued with REPLACE policy")
         }
 
         fun cancelPeriodicSync(context: Context) {

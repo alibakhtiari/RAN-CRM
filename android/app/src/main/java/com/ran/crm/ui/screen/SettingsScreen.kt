@@ -258,13 +258,9 @@ fun SettingsScreen(
                         Card(
                                 modifier =
                                         Modifier.fillMaxWidth().clickable {
-                                                Toast.makeText(
-                                                                context,
-                                                                "Sync initiated...",
-                                                                Toast.LENGTH_SHORT
-                                                        )
-                                                        .show()
+                                                SyncLogger.log("UI: Sync Data button clicked (Manual Sync)")
                                                 SyncWorker.scheduleOneTimeSync(context, true)
+                                                Toast.makeText(context, "Sync initiated", Toast.LENGTH_SHORT).show()
                                         },
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
