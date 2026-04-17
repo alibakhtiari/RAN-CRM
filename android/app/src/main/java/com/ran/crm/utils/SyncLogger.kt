@@ -36,13 +36,15 @@ object SyncLogger {
         }
 
         // 2. Log to File (Async)
-        // Note: In a real production app, we might use a proper logging library or database.
-        // For now, a simple text file is sufficient for debugging.
         try {
-            val context = CrmApplication.instance
-            scope.launch { appendLogToFile(context, message, error) }
+            val context = try { CrmApplication.instance } catch (e: Exception) { null }
+            if (context != null) {
+                scope.launch { appendLogToFile(context, message, error) }
+            } else {
+                Log.w(TAG, "SyncLogger: Cannot log to file - Application instance not ready")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write log to file", e)
+            Log.e(TAG, "Failed to initiate log write", e)
         }
     }
 
@@ -65,7 +67,7 @@ object SyncLogger {
                 file.appendText("[$timestamp] Log rotated\n")
             }
         } catch (e: Exception) {
-            // Ignore file errors
+            Log.e(TAG, "SyncLogger: ERROR writing to file: ${e.message}", e)
         }
     }
 
@@ -82,6 +84,7 @@ object SyncLogger {
         try {
             val file = File(context.filesDir, LOG_FILE_NAME)
             if (file.exists()) file.writeText("")
+            log("Logs cleared manually from UI")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear logs", e)
         }

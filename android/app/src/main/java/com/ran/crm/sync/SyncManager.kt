@@ -191,6 +191,9 @@ class SyncManager private constructor(private val context: Context) {
                     "Device Export Complete: Created=${result.exported}, Updated=${result.updated}, Errors=${result.errors}"
             )
 
+            // Update timestamp even if there were minor errors, as long as the process completed
+            // to show that a sync ATTEMPT was successfully finished.
+            preferenceManager.lastSyncContacts = System.currentTimeMillis()
             return result.errors == 0
         } catch (e: Exception) {
             SyncLogger.log("Contact Sync Failed", e)
@@ -229,6 +232,7 @@ class SyncManager private constructor(private val context: Context) {
             }
 
             SyncLogger.log("Call Log Sync Complete")
+            preferenceManager.lastSyncCalls = System.currentTimeMillis()
             return true
         } catch (e: Exception) {
             SyncLogger.log("Call Log Sync Failed", e)
