@@ -656,6 +656,16 @@ fun SettingsScreen(
                         onCopy = {
                                 clipboardManager.setText(AnnotatedString(logsText))
                                 Toast.makeText(context, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        onTestLog = {
+                                SyncLogger.log("Testing SyncLogger from Settings UI")
+                                // Refresh logs after brief delay for writing
+                                scope.launch {
+                                        kotlinx.coroutines.delay(200)
+                                        logsText = withContext(Dispatchers.IO) {
+                                                SyncLogger.getLogs(context)
+                                        }
+                                }
                         }
                 )
         }
@@ -666,7 +676,8 @@ fun LogViewerDialog(
         onDismiss: () -> Unit,
         logsText: String,
         onClear: () -> Unit,
-        onCopy: () -> Unit
+        onCopy: () -> Unit,
+        onTestLog: () -> Unit
 ) {
         AlertDialog(
                 onDismissRequest = onDismiss,
@@ -698,6 +709,9 @@ fun LogViewerDialog(
                 },
                 dismissButton = {
                         Row {
+                                TextButton(onClick = onTestLog) {
+                                        Text("Test Log")
+                                }
                                 TextButton(onClick = onClear) {
                                         Text("Clear", color = MaterialTheme.colorScheme.error)
                                 }
@@ -707,7 +721,6 @@ fun LogViewerDialog(
                         }
                 }
         )
-}
 }
 
 @Composable
