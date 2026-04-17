@@ -34,8 +34,14 @@ import com.ran.crm.data.local.PreferenceManager
 import com.ran.crm.data.remote.ApiClient
 import com.ran.crm.ui.AppConfig
 import com.ran.crm.work.SyncWorker
+import android.content.SharedPreferences
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import com.ran.crm.utils.SyncLogger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,8 +54,25 @@ fun SettingsScreen(
         val scope = rememberCoroutineScope()
 
         // Sync Status
-        // Sync Status
         var lastSyncTime by remember { mutableStateOf(preferenceManager.lastSyncContacts) }
+
+        // Observe preference changes to update timestamp dynamically
+        DisposableEffect(Unit) {
+                val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (key == "last_sync_contacts") {
+                                lastSyncTime = preferenceManager.lastSyncContacts
+                        }
+                }
+                preferenceManager.registerOnSharedPreferenceChangeListener(listener)
+                onDispose {
+                        preferenceManager.unregisterOnSharedPreferenceChangeListener(listener)
+                }
+        }
+
+        // Log Viewer state
+        var showLogsDialog by remember { mutableStateOf(false) }
+        var logsText by remember { mutableStateOf("") }
+        val clipboardManager = LocalClipboardManager.current
 
         // Server Status
         var isServerConnected by remember { mutableStateOf<Boolean?>(null) }
@@ -285,6 +308,20 @@ fun SettingsScreen(
                                                                         MaterialTheme.colorScheme
                                                                                 .onSurfaceVariant
                                                         )
+                                                }
+
+                                                TextButton(
+                                                        onClick = {
+                                                                scope.launch {
+                                                                        val logs = withContext(Dispatchers.IO) {
+                                                                                SyncLogger.getLogs(context)
+                                                                        }
+                                                                        logsText = logs
+                                                                        showLogsDialog = true
+                                                                }
+                                                        }
+                                                ) {
+                                                        Text("View Logs")
                                                 }
                                         }
 
@@ -607,6 +644,70 @@ fun SettingsScreen(
                         ) { Text("Logout") }
                 }
         }
+
+        if (showLogsDialog) {
+                LogViewerDialog(
+                        onDismiss = { showLogsDialog = false },
+                        logsText = logsText,
+                        onClear = {
+                                SyncLogger.clearLogs(context)
+                                logsText = "Logs cleared."
+                        },
+                        onCopy = {
+                                clipboardManager.setText(AnnotatedString(logsText))
+                                Toast.makeText(context, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                        }
+                )
+        }
+}
+
+@Composable
+fun LogViewerDialog(
+        onDismiss: () -> Unit,
+        logsText: String,
+        onClear: () -> Unit,
+        onCopy: () -> Unit
+) {
+        AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Sync Logs") },
+                text = {
+                        Column {
+                                Card(
+                                        modifier = Modifier.fillMaxWidth().height(400.dp),
+                                        colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                ) {
+                                        Box(
+                                                modifier = Modifier
+                                                        .padding(8.dp)
+                                                        .verticalScroll(rememberScrollState())
+                                        ) {
+                                                Text(
+                                                        text = logsText,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                        }
+                                }
+                        }
+                },
+                confirmButton = {
+                        TextButton(onClick = onDismiss) { Text("Close") }
+                },
+                dismissButton = {
+                        Row {
+                                TextButton(onClick = onClear) {
+                                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                                }
+                                TextButton(onClick = onCopy) {
+                                        Text("Copy")
+                                }
+                        }
+                }
+        )
+}
 }
 
 @Composable
