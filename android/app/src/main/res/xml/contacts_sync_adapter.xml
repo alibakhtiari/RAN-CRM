@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SyncAdapter that binds to com.android.contacts authority.
+    This is required for our contacts to appear in the phone's Contacts app
+    and for our account to show up in Settings > Accounts with a "Contacts" toggle.
+-->
+<sync-adapter
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:contentAuthority="com.android.contacts"
+    android:accountType="com.ran.crm.account"
+    android:userVisible="true"
+    android:supportsUploading="true"
+    android:allowParallelSyncs="false"
+    android:isAlwaysSyncable="true" />
