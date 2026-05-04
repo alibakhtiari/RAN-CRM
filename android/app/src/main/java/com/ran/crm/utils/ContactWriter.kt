@@ -25,8 +25,8 @@ class ContactWriter(
         private val CRM_CONTACT_NOTE = "RAN_CRM_CONTACT"
 
         companion object {
-                // Constants formerly in AccountHelper
-                private const val ACCOUNT_TYPE = "com.ran.crm"
+                // Must match the account type registered in authenticator.xml / CrmApplication
+                private const val ACCOUNT_TYPE = "com.ran.crm.account"
                 private const val ACCOUNT_NAME = "RAN CRM"
         }
 
