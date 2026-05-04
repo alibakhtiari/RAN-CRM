@@ -38,7 +38,7 @@ class CrmApplication : Application() {
 
     /**
      * Creates the CRM system account (visible in Settings > Accounts) and enables periodic sync via
-     * the SyncAdapter framework.
+     * the SyncAdapter framework for both our custom provider and the contacts authority.
      */
     private fun ensureSystemAccount(intervalMinutes: Int) {
         val accountManager = AccountManager.get(this)
@@ -50,12 +50,24 @@ class CrmApplication : Application() {
             SyncLogger.log("CrmApplication: System account created")
         }
 
-        // Enable auto-sync for the system account
+        // Enable auto-sync for the custom provider authority
         ContentResolver.setIsSyncable(account, AUTHORITY, 1)
         ContentResolver.setSyncAutomatically(account, AUTHORITY, true)
         ContentResolver.addPeriodicSync(
                 account,
                 AUTHORITY,
+                Bundle.EMPTY,
+                intervalMinutes.toLong() * 60
+        )
+
+        // Enable auto-sync for the contacts authority — this is what makes
+        // contacts visible in the phone's Contacts app and adds a "Contacts"
+        // toggle in Settings > Accounts > RAN CRM
+        ContentResolver.setIsSyncable(account, CONTACTS_AUTHORITY, 1)
+        ContentResolver.setSyncAutomatically(account, CONTACTS_AUTHORITY, true)
+        ContentResolver.addPeriodicSync(
+                account,
+                CONTACTS_AUTHORITY,
                 Bundle.EMPTY,
                 intervalMinutes.toLong() * 60
         )
@@ -65,6 +77,7 @@ class CrmApplication : Application() {
         const val ACCOUNT_TYPE = "com.ran.crm.account"
         const val ACCOUNT_NAME = "RAN CRM"
         const val AUTHORITY = "com.ran.crm.provider"
+        const val CONTACTS_AUTHORITY = "com.android.contacts"
 
         lateinit var instance: CrmApplication
             private set
