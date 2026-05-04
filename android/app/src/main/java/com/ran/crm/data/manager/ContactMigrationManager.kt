@@ -26,8 +26,10 @@ class ContactMigrationManager(
                                                 ContactsContract.CommonDataKinds.Phone
                                                         .NORMALIZED_NUMBER
                                         ),
-                                        null,
-                                        null,
+                                        // Exclude contacts that belong to our own CRM account
+                                        // to prevent re-importing contacts we exported
+                                        "${ContactsContract.RawContacts.ACCOUNT_TYPE} IS NULL OR ${ContactsContract.RawContacts.ACCOUNT_TYPE} != ?",
+                                        arrayOf("com.ran.crm.account"),
                                         null
                                 )
 
