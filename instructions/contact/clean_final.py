@@ -3,7 +3,9 @@ import phonenumbers
 import re
 import os
 import glob
+import quopri
 
+# Use the same 'csvs' folder but look for .vcf files now
 INPUT_DIR = os.path.join(os.path.dirname(__file__), 'csvs')
 OUTPUT_FILE = os.path.join(os.path.dirname(__file__), 'cleaned_contacts_final.csv')
 DEFAULT_REGION = 'IR'
@@ -24,6 +26,84 @@ CREATOR_MAP = {
     # but don't assign a creator (defaults to RamzArz if no other match)
     "شد": None 
 }
+
+def decode_quoted_printable(text, charset='utf-8'):
+    """Decodes quoted-printable encoded text into the specified charset."""
+    if not text:
+        return ""
+    try:
+        # Some VCFs use =0D=0A for newlines, we clean them up
+        text = text.replace('=\n', '').replace('=\r\n', '')
+        decoded_bytes = quopri.decodestring(text.encode('ascii'))
+        return decoded_bytes.decode(charset, errors='replace')
+    except Exception:
+        return text
+
+def parse_vcf(file_path):
+    """Parses a VCF file and returns a list of contact dictionaries."""
+    contacts = []
+    current_contact = None
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"Error opening {file_path}: {e}")
+        return []
+
+    # Handle line folding
+    folded_lines = []
+    for line in lines:
+        if line.startswith(' ') or line.startswith('\t'):
+            if folded_lines:
+                folded_lines[-1] = folded_lines[-1].rstrip() + line.lstrip()
+        else:
+            folded_lines.append(line.strip())
+
+    for line in folded_lines:
+        if not line: continue
+        
+        if line == "BEGIN:VCARD":
+            current_contact = {'TEL': []}
+            continue
+        elif line == "END:VCARD":
+            if current_contact:
+                contacts.append(current_contact)
+            current_contact = None
+            continue
+            
+        if not current_contact or ':' not in line:
+            continue
+            
+        key_part, value = line.split(':', 1)
+        key_parts = key_part.split(';')
+        tag = key_parts[0].upper()
+        params = key_parts[1:]
+        
+        # Check for Quoted-Printable and Charset
+        is_qp = any('ENCODING=QUOTED-PRINTABLE' in p.upper() for p in params)
+        charset = 'utf-8'
+        for p in params:
+            if p.upper().startswith('CHARSET='):
+                charset = p.split('=')[1].lower()
+        
+        if is_qp:
+            value = decode_quoted_printable(value, charset)
+            
+        if tag == 'FN':
+            current_contact['Full Name'] = value
+        elif tag == 'N':
+            parts = value.split(';')
+            current_contact['Surname'] = parts[0] if len(parts) > 0 else ""
+            current_contact['First Name'] = parts[1] if len(parts) > 1 else ""
+        elif tag == 'TEL':
+            current_contact['TEL'].append(value)
+        elif tag == 'ORG':
+            current_contact['Organization'] = value
+        elif tag == 'EMAIL':
+            current_contact['Email'] = value
+            
+    return contacts
 
 def normalize_persian_chars(text):
     """Replaces Arabic style chars with Persian style for consistent matching."""
@@ -118,79 +198,79 @@ def is_garbage_name(cleaned_name):
     return False
 
 def process_contacts():
-    # Find all CSV files in the folder
-    csv_files = glob.glob(os.path.join(INPUT_DIR, "*.csv"))
+    # Find all VCF files in the folder
+    vcf_files = glob.glob(os.path.join(INPUT_DIR, "*.vcf"))
     
-    if not csv_files:
-        print(f"No CSV files found in {INPUT_DIR}")
+    if not vcf_files:
+        print(f"No VCF files found in {INPUT_DIR}")
         return
 
-    print(f"Found {len(csv_files)} CSV files. Merging...")
-    
-    dfs = []
-    for f in csv_files:
-        try:
-            dfs.append(pd.read_csv(f, dtype=str))
-        except Exception as e:
-            print(f"Error reading {f}: {e}")
-            
-    if not dfs:
-        print("No data could be read.")
-        return
-
-    # Merge all dataframes
-    df = pd.concat(dfs, ignore_index=True)
-    
-    # Remove duplicates before processing
-    initial_count = len(df)
-    df.drop_duplicates(inplace=True)
-    print(f"Total rows after merging: {initial_count}")
-    print(f"Total rows after removing exact duplicates: {len(df)}")
+    print(f"Found {len(vcf_files)} VCF files. Processing...")
     
     clean_rows = []
-    phone_cols = [c for c in df.columns if "Phone" in c and "Value" in c]
+    total_raw_contacts = 0
 
-    for index, row in df.iterrows():
-        # Optional: Skip if not in 'myContacts' (uncomment if you want this)
-        # labels = str(row.get('Labels', ''))
-        # if 'myContacts' not in labels: continue
-
-        original_full_name = get_full_name(row)
+    for f_path in vcf_files:
+        print(f"Reading {os.path.basename(f_path)}...")
+        contacts = parse_vcf(f_path)
+        total_raw_contacts += len(contacts)
         
-        # Create search string
-        row_str = " ".join([str(x) for x in row.values if str(x).lower() != 'nan'])
-        
-        # Identify creator AND get a cleaner version of the name
-        final_name, creator = clean_name_and_find_creator(original_full_name, row_str)
-        
-        # Check if the RESULTING name is valid
-        if is_garbage_name(final_name):
-            continue
-
-        # Extract Phones
-        contact_phones = set()
-        for col in phone_cols:
-            raw_val = str(row.get(col, '') or '')
-            if not raw_val or raw_val.lower() == 'nan': continue
+        for c in contacts:
+            # 1. Get Name
+            first = c.get('First Name', '').strip()
+            last = c.get('Surname', '').strip()
+            full = c.get('Full Name', '').strip()
             
-            parts = raw_val.replace(' ::: ', ':::').split(':::')
-            for part in parts:
-                normalized = normalize_phone(part)
-                if normalized:
-                    contact_phones.add(normalized)
+            # Use Full Name if First/Last are empty
+            name_to_clean = f"{first} {last}".strip()
+            if not name_to_clean:
+                name_to_clean = full
+            
+            name_to_clean = normalize_persian_chars(name_to_clean)
+            
+            # 2. Create Search String for Creator Identification
+            # Combine all text fields to find keywords
+            search_vals = [str(v) for v in c.values() if not isinstance(v, list)]
+            search_vals.extend(c.get('TEL', []))
+            row_str = " ".join(search_vals)
+            
+            # 3. Clean Name and Identify Creator
+            final_name, creator = clean_name_and_find_creator(name_to_clean, row_str)
+            
+            # 4. Filter Garbage
+            if is_garbage_name(final_name):
+                continue
 
-        if contact_phones:
-            for phone in contact_phones:
-                clean_rows.append({
-                    "Name": final_name,
-                    "Phone": phone,
-                    "Created By": creator
-                })
+            # 5. Extract and Normalize Phones
+            contact_phones = set()
+            for raw_phone in c.get('TEL', []):
+                if not raw_phone: continue
+                # Handle potential ::: separator if it exists in VCF (rare but possible if exported from certain tools)
+                parts = raw_phone.replace(' ::: ', ':::').split(':::')
+                for part in parts:
+                    normalized = normalize_phone(part)
+                    if normalized:
+                        contact_phones.add(normalized)
+
+            # 6. Add to result
+            if contact_phones:
+                for phone in contact_phones:
+                    clean_rows.append({
+                        "Name": final_name,
+                        "Phone": phone,
+                        "Created By": creator
+                    })
+
+    if not clean_rows:
+        print("No valid contacts found after processing.")
+        return
 
     output_df = pd.DataFrame(clean_rows)
     output_df.drop_duplicates(inplace=True)
     output_df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
-    print(f"Success! Processed {len(df)} contacts.")
+    
+    print(f"\nSuccess!")
+    print(f"Total VCF contacts read: {total_raw_contacts}")
     print(f"Generated {len(output_df)} clean rows.")
     print(f"Done! Saved to {OUTPUT_FILE}")
 
