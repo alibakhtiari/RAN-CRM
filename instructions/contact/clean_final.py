@@ -52,14 +52,28 @@ def parse_vcf(file_path):
         print(f"Error opening {file_path}: {e}")
         return []
 
-    # Handle line folding
+    # Handle line folding (both standard VCF folding and non-standard QP folding)
     folded_lines = []
     for line in lines:
-        if line.startswith(' ') or line.startswith('\t'):
-            if folded_lines:
-                folded_lines[-1] = folded_lines[-1].rstrip() + line.lstrip()
+        if not line.strip() and not line.startswith((' ', '\t')):
+            continue
+            
+        is_continuation = False
+        if line.startswith((' ', '\t')):
+            is_continuation = True
+        elif folded_lines:
+            prev = folded_lines[-1]
+            # If previous line ends with '=' (QP soft break) and current has no ':', 
+            # it's almost certainly a continuation
+            if prev.endswith('=') and ':' not in line:
+                is_continuation = True
+        
+        if is_continuation and folded_lines:
+            # Remove the folding character (if space) and join
+            content = line[1:] if line.startswith((' ', '\t')) else line
+            folded_lines[-1] = folded_lines[-1].rstrip('\r\n') + content.rstrip('\r\n')
         else:
-            folded_lines.append(line.strip())
+            folded_lines.append(line.rstrip('\r\n'))
 
     for line in folded_lines:
         if not line: continue
