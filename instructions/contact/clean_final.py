@@ -111,7 +111,8 @@ def normalize_persian_chars(text):
     translations = {
         'ك': 'ک', 'دِ': 'د', 'بِ': 'ب', 'زِ': 'ز', 'ذِ': 'ذ', 'شِ': 'ش', 'سِ': 'س',
         'ى': 'ی', 'ي': 'ی', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5',
-        '٦': '6', '٧': '7', '٨': '8', '٩': '9', '٠': '0'
+        '٦': '6', '٧': '7', '٨': '8', '٩': '9', '٠': '0',
+        '\ufffd': '' # Remove replacement characters
     }
     for bad, good in translations.items():
         text = text.replace(bad, good)
