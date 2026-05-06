@@ -32,8 +32,9 @@ def decode_quoted_printable(text, charset='utf-8'):
     if not text:
         return ""
     try:
-        # Some VCFs use =0D=0A for newlines, we clean them up
-        text = text.replace('=\n', '').replace('=\r\n', '')
+        # Handle soft breaks and VCF folding artifacts.
+        # We remove any '=' that is NOT followed by two hex digits (standard QP soft break cleanup)
+        text = re.sub(r'=(?![0-9A-F]{2})', '', text)
         decoded_bytes = quopri.decodestring(text.encode('ascii'))
         return decoded_bytes.decode(charset, errors='replace')
     except Exception:
@@ -93,9 +94,9 @@ def parse_vcf(file_path):
         if tag == 'FN':
             current_contact['Full Name'] = value
         elif tag == 'N':
-            parts = value.split(';')
-            current_contact['Surname'] = parts[0] if len(parts) > 0 else ""
-            current_contact['First Name'] = parts[1] if len(parts) > 1 else ""
+            # Capture all parts: Surname;Given;Additional;Prefix;Suffix
+            parts = [p.strip() for p in value.split(';') if p.strip()]
+            current_contact['Name Parts'] = parts
         elif tag == 'TEL':
             current_contact['TEL'].append(value)
         elif tag == 'ORG':
@@ -192,8 +193,9 @@ def is_garbage_name(cleaned_name):
     if chars_only.replace(" ", "").isdigit():
         return True
         
-    # Length check (e.g. "A", "12")
-    if len(chars_only.strip()) < 3:
+    # Length check (removed as per user request to avoid limits, 
+    # but kept a minimal check for completely empty/meaningless names)
+    if not chars_only.strip():
         return True
         
     return False
@@ -218,14 +220,16 @@ def process_contacts():
         
         for c in contacts:
             # 1. Get Name
-            first = c.get('First Name', '').strip()
-            last = c.get('Surname', '').strip()
             full = c.get('Full Name', '').strip()
+            parts = c.get('Name Parts', [])
             
-            # Use Full Name if First/Last are empty
-            name_to_clean = f"{first} {last}".strip()
-            if not name_to_clean:
-                name_to_clean = full
+            # Combine all parts of N field (e.g. Prefix, First, Middle, Last)
+            # We join them with space. N parts are usually ordered Surname;Given;Additional;Prefix;Suffix
+            # but we just want to ensure all info is captured.
+            name_from_parts = " ".join(parts).strip()
+            
+            # Prefer the combination of parts if available, else use FN
+            name_to_clean = name_from_parts if name_from_parts else full
             
             name_to_clean = normalize_persian_chars(name_to_clean)
             
