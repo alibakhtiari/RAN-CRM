@@ -111,6 +111,7 @@ fun SettingsScreen(
         var currentTheme by remember { mutableStateOf(preferenceManager.appTheme) }
         var currentScale by remember { mutableFloatStateOf(preferenceManager.fontScale) }
         var currentInterval by remember { mutableIntStateOf(preferenceManager.syncIntervalMinutes) }
+        var currentDebugMode by remember { mutableStateOf(preferenceManager.isDebugMode) }
 
         // Permissions State
         val permissions = remember {
@@ -313,19 +314,48 @@ fun SettingsScreen(
                                                         )
                                                 }
 
-                                                TextButton(
-                                                        onClick = {
-                                                                scope.launch {
-                                                                        val logs = withContext(Dispatchers.IO) {
-                                                                                SyncLogger.getLogs(context)
+                                                if (currentDebugMode) {
+                                                        TextButton(
+                                                                onClick = {
+                                                                        scope.launch {
+                                                                                val logs = withContext(Dispatchers.IO) {
+                                                                                        SyncLogger.getLogs(context)
+                                                                                }
+                                                                                logsText = logs
+                                                                                showLogsDialog = true
                                                                         }
-                                                                        logsText = logs
-                                                                        showLogsDialog = true
                                                                 }
+                                                        ) {
+                                                                Text("View Logs")
                                                         }
-                                                ) {
-                                                        Text("View Logs")
                                                 }
+                                        }
+
+                                        HorizontalDivider()
+
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                                text = "Debug Mode",
+                                                                style = MaterialTheme.typography.bodyMedium
+                                                        )
+                                                        Text(
+                                                                text = "Enable verbose logging and debug tools",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                }
+                                                Switch(
+                                                        checked = currentDebugMode,
+                                                        onCheckedChange = {
+                                                                preferenceManager.isDebugMode = it
+                                                                currentDebugMode = it
+                                                        }
+                                                )
                                         }
 
                                         // Import Contacts section removed to run automatically
