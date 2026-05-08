@@ -22,6 +22,7 @@ class PreferenceManager(context: Context) {
         private const val KEY_FONT_SCALE = "font_scale"
         private const val KEY_SYNC_INTERVAL_MINUTES = "sync_interval_minutes"
         private const val KEY_IS_ADMIN = "is_admin"
+        private const val KEY_DEBUG_MODE = "debug_mode"
 
         private fun createEncryptedPrefs(context: Context): SharedPreferences {
             return try {
@@ -93,6 +94,10 @@ class PreferenceManager(context: Context) {
     var isAdmin: Boolean
         get() = prefs.getBoolean(KEY_IS_ADMIN, false)
         set(value) = prefs.edit().putBoolean(KEY_IS_ADMIN, value).apply()
+
+    var isDebugMode: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_MODE, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_MODE, value).apply()
 
     var userId: String?
         get() = prefs.getString(KEY_USER_ID, null)
