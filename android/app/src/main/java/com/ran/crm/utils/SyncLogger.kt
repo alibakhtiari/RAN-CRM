@@ -3,6 +3,7 @@ package com.ran.crm.utils
 import android.content.Context
 import android.util.Log
 import com.ran.crm.CrmApplication
+import com.ran.crm.data.local.PreferenceManager
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -39,7 +40,10 @@ object SyncLogger {
         try {
             val context = try { CrmApplication.instance } catch (e: Exception) { null }
             if (context != null) {
-                scope.launch { appendLogToFile(context, message, error) }
+                val prefs = PreferenceManager(context)
+                if (prefs.isDebugMode) {
+                    scope.launch { appendLogToFile(context, message, error) }
+                }
             } else {
                 Log.w(TAG, "SyncLogger: Cannot log to file - Application instance not ready")
             }
