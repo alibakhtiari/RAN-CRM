@@ -120,11 +120,18 @@ object ApiClient {
                         .readTimeout(30, TimeUnit.SECONDS)
                         .writeTimeout(30, TimeUnit.SECONDS)
 
-        // Only log HTTP bodies in debug builds
-        if (BuildConfig.DEBUG) {
-            val loggingInterceptor =
-                    HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-            builder.addInterceptor(loggingInterceptor)
+        // Log HTTP bodies in debug builds or when debug mode is enabled in settings
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.NONE
+        }
+        builder.addInterceptor { chain ->
+            val prefs = PreferenceManager(CrmApplication.instance)
+            loggingInterceptor.level = if (BuildConfig.DEBUG || prefs.isDebugMode) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            loggingInterceptor.intercept(chain)
         }
 
         builder.build()
